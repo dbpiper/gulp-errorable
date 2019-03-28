@@ -1,13 +1,16 @@
-import { series, task } from 'gulp';
+import { parallel, series } from 'gulp';
 import _ from 'lodash';
-import { Task, TaskFunction } from 'undertaker';
-import { slackSendMessage } from '../config/gulp/helpers/slack';
+import { Task } from 'undertaker';
+import DefaultRegistry from 'undertaker-registry';
 
 // This simply matches the type used in undertaker
 // tslint:disable-next-line: no-any
 type PromiseTaskFunction<T> = (done: (error?: any) => void) => Promise<T>;
+// tslint:disable-next-line: no-any
+export type ErrorHandlingFunction = () => Promise<any>;
 
-const taskErrorable = <T>(
+const _taskErrorable = <T>(
+  errorHandlingFunction: ErrorHandlingFunction,
   taskFunction: PromiseTaskFunction<T>,
 ): PromiseTaskFunction<T> => () =>
   new Promise<T>(async (resolve, reject) => {
@@ -15,36 +18,52 @@ const taskErrorable = <T>(
       const result = await taskFunction(() => undefined);
       resolve(result);
     } catch (error) {
-      await slackSendMessage(false);
+      await errorHandlingFunction();
       reject(error);
     }
   });
 
-const _createTaskFunctions = <T>(
-  // tslint:disable-next-line: prefer-array-literal
-  ...taskFunctionCandidates: Array<PromiseTaskFunction<T>>
-) => {
-  const arrayCandidates = [...taskFunctionCandidates];
-  return _.map(arrayCandidates, taskFunctionCandidate => {
-    const taskFunction = taskErrorable(taskFunctionCandidate);
-    return {
-      taskFunction,
-      name: taskFunctionCandidate.name,
-    };
-  });
-};
+class ErrorableRegistry extends DefaultRegistry {
+  // tslint:disable-next-line: no-any
+  [task: string]: any;
+  public errorHandlingFunction: ErrorHandlingFunction;
 
-const seriesErrorable = <T>(
-  // tslint:disable-next-line: prefer-array-literal
-  ...taskFunctionCandidates: Array<PromiseTaskFunction<T>>
-): TaskFunction => {
-  const taskFunctions = _createTaskFunctions(...taskFunctionCandidates);
-  const registerTasks: Task[] = _.map(taskFunctions, wrappedTaskFunction => {
-    task(wrappedTaskFunction.name, wrappedTaskFunction.taskFunction);
-    console.log(wrappedTaskFunction.name);
-    return task(wrappedTaskFunction.name);
-  });
-  return series(registerTasks);
-};
+  // tslint:disable-next-line: no-any
+  constructor(errorHandlingFunction: ErrorHandlingFunction) {
+    super();
+    this.errorHandlingFunction = errorHandlingFunction;
+  }
 
-export { taskErrorable, seriesErrorable };
+  // tslint:disable-next-line: no-any
+  public set(name: string, fn: any): any {
+    // this is a private variable and thus has no
+    // type definitions, it makes no sense to do so as no one should
+    // be using them, aside from people implementing custom registries
+    // tslint:disable-next-line: no-unsafe-any
+    return (this._tasks[name] = _taskErrorable(this.errorHandlingFunction, fn));
+  }
+}
+
+const seriesPromise = (...tasks: Task[]): PromiseTaskFunction<any> => () =>
+  new Promise((resolve, reject) => {
+    series(...tasks)(error => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve();
+      }
+    });
+  });
+
+const parallelPromise = (...tasks: Task[]): PromiseTaskFunction<any> => () =>
+  new Promise((resolve, reject) => {
+    parallel(...tasks)(error => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve();
+      }
+    });
+  });
+
+export { ErrorableRegistry, seriesPromise, parallelPromise };

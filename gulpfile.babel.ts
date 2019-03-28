@@ -1,7 +1,12 @@
+import gulp from 'gulp';
 import terminalSpawn from 'terminal-spawn';
 
 import { slackSendMessage, startTimer } from './config/gulp/helpers/slack';
-import { seriesErrorable } from './src/index';
+import {
+  ErrorableRegistry,
+  ErrorHandlingFunction,
+  seriesPromise,
+} from './src/index';
 
 /* *****************************************************************************
  * Private
@@ -12,6 +17,16 @@ import { seriesErrorable } from './src/index';
 // -----------------------------------------------------------------------------
 
 const _sleepPreviewSeconds = 8;
+const _slackErrorHandler: ErrorHandlingFunction = () => slackSendMessage(false);
+
+const _sleep = (seconds: number = 0) =>
+  terminalSpawn(`sleep ${seconds}`).promise;
+
+// -----------------------------------------------------------------------------
+// Gulp Registry
+// -----------------------------------------------------------------------------
+
+gulp.registry(new ErrorableRegistry(_slackErrorHandler));
 
 // -----------------------------------------------------------------------------
 // Tasks
@@ -30,7 +45,7 @@ const _slackNotify = async () => {
   return Promise.resolve();
 };
 
-const _runTest = () => terminalSpawn('npx jest').promise;
+const _runTest = () => terminalSpawn('npx jest --passWithNoTests').promise;
 
 const _buildJs = () =>
   terminalSpawn(`npx babel src --out-dir lib --extensions ".ts"`).promise;
@@ -39,7 +54,7 @@ const _buildTypes = () => terminalSpawn('npx tsc').promise;
 
 const _checkTypes = () => terminalSpawn('npx tsc -p "./tsconfig.json"').promise;
 
-const _lintTS = () => {
+const _lintTs = () => {
   const rootFiles = '"./*.ts?(x)"';
   const srcFiles = '"./src/**/*.ts?(x)"';
   const configFiles = '"./config/**/*.ts?(x)"';
@@ -51,16 +66,13 @@ const _lintTS = () => {
 
 const _gitStatus = () => terminalSpawn('npx git status').promise;
 
-const _sleep = (seconds: number = 0) =>
-  terminalSpawn(`sleep ${seconds}`).promise;
-
 const _sleepForReview = () => {
   // giving 4 seconds to review the git commit status
   const reviewTime = 4;
   return _sleep(reviewTime);
 };
 
-const _gitStatusHumanReview = seriesErrorable(_gitStatus, _sleepForReview);
+const _gitStatusHumanReview = seriesPromise(_gitStatus, _sleepForReview);
 
 const _failMe = () => Promise.reject('failed!!');
 
@@ -68,15 +80,17 @@ const _failMe = () => Promise.reject('failed!!');
  * Public
  **************************************************************************** */
 
-const lint = seriesErrorable(_lintTS, _checkTypes);
+const lint = seriesPromise(_lintTs, _checkTypes);
 
-const build = seriesErrorable(_buildJs, _buildTypes);
+const build = seriesPromise(_buildJs, _buildTypes);
 
-const test = seriesErrorable(build, _runTest);
+const test = seriesPromise(build, _runTest);
 
-const verify = seriesErrorable(
+const verify = seriesPromise(
   _registerSlackNotify,
   _gitStatusHumanReview,
+  lint,
+  test,
   _slackNotify,
 );
 

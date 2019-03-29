@@ -1,0 +1,27 @@
+os: linux
+dist: xenial
+language: node_js
+env: NODE_ENV=development
+node_js:
+  - lts/*
+notifications:
+  slack:
+    rooms:
+      - secure: n32pECOT83e+sMoOxpYIqTNsbkac6ijlsPJEVMS09A7k3k4HsFVinFBHpzLJhYeD2u05ObNcT9+y1ZF3PKZgZhu8WbnuH7ghPoFp78RFI0t4vl9K40mEjL+P8Kj6BG1ecqGQ8KwJmCF7KGS6oJbRDSiYiQ2MMOVK/oKl6cSnkXHzawip3iFmcL0VoNXWIFXBvdgEW//A2tumvcdwi7DrwEsjWfrqTweA74DpN2OhOrhNRC2wTVQoS+ySA+x+sc/pGfOINmYDJtKff2WpeT/vzLKNURbHjGDunc7V6XBCrRY9f2lcJBpE2SCpCIKfjATUCYj5zqGPnTzhRApK+ywx7E2njjIu3lhXi5xapn3ltRn7wZGUrOe0/9SG20GZgsQ3zfo4vCm7FFHPp2Us2SbXVuYoWndfqI9EwllZYjYRBPESzm1ikBf6bs5G31srZ0s+sen6xfJmlwTvzEwCGebJnbdYKbUW3KTXZ4eam5ktbnIXbXVG0eNCRNcwv7blX59nSD2MY1WdHqPhVLCfDW8wrxS2B7yX93ZCwDrWPSjyG3ulZhGArEUYfuruuNM40pGzT2iEDn83KOfYGFMndVAR91YM2Fagvi8StBkxc0DlNMGJVhudj5U1WlnSJ4e//dio7vJ7zvoZI4ta5zeFoACcQ4rLBAbmH8nu9LFFhJ2CZMU=
+    on_success: always
+    on_failure: always
+    on_pull_requests: true
+cache:
+  directories:
+    - '$HOME/.npm'
+before_install:
+  - openssl aes-256-cbc -K $encrypted_6aa6d2b4c6f4_key -iv $encrypted_6aa6d2b4c6f4_iv
+    -in travis-key.enc -out travis-key -d
+  - sudo apt-get update
+  - sudo apt-get install git-crypt
+  - git-crypt unlock travis-key
+install:
+  - npm ci
+  - npm link
+  - npm link gulp-errorable
+script: npm run verifyCi

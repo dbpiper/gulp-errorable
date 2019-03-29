@@ -16,7 +16,6 @@ import {
 // Variables
 // -----------------------------------------------------------------------------
 
-const _sleepPreviewSeconds = 8;
 const _slackErrorHandler: ErrorHandlingFunction = () => slackSendMessage(false);
 
 const _sleep = (seconds: number = 0) =>
@@ -77,8 +76,6 @@ const _gitStatusHumanReview = seriesPromise({
   tasks: [_gitStatus, _sleepForReview],
 });
 
-const _failMe = () => Promise.reject('failed!!');
-
 /* *****************************************************************************
  * Public
  **************************************************************************** */
@@ -98,15 +95,19 @@ const test = seriesPromise({
   tasks: [build, _runTest],
 });
 
-const verify = seriesPromise({
-  name: 'verify',
-  tasks: [
-    _registerSlackNotify,
-    _gitStatusHumanReview,
-    lint,
-    test,
-    _slackNotify,
-  ],
+const lintTest = seriesPromise({
+  name: 'lintTest',
+  tasks: [lint, test],
 });
 
-export { lint, build, test, verify };
+const verifyCi = seriesPromise({
+  name: 'verifyCi',
+  tasks: [_registerSlackNotify, lintTest],
+});
+
+const verify = seriesPromise({
+  name: 'verify',
+  tasks: [_registerSlackNotify, _gitStatusHumanReview, lintTest, _slackNotify],
+});
+
+export { lint, build, test, verify, verifyCi, lintTest };

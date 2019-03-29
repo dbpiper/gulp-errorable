@@ -4,3 +4,4 @@ coverage/
 .vscode/launch.json
 
 example/
+travis-key

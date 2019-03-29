@@ -11,17 +11,22 @@ let _startTime: moment.Moment;
 const _getNiceString = (timeTakenMs: number) => {
   const timeTaken = moment.duration(timeTakenMs, 'milliseconds');
   const millisecondsInSecond = 1000;
+  const precision = 2;
 
   if (timeTaken.seconds() < 1) {
-    return `${timeTaken.milliseconds()} milliseconds`;
+    return `${timeTaken.milliseconds().toFixed(precision)} milliseconds`;
   }
   if (timeTaken.minutes() < 1) {
-    return `${timeTaken.seconds() +
-      timeTaken.milliseconds() / millisecondsInSecond} seconds`;
+    return `${(
+      timeTaken.seconds() +
+      timeTaken.milliseconds() / millisecondsInSecond
+    ).toFixed(precision)} seconds`;
   }
 
-  return `${timeTaken.minutes()} minutes, ${timeTaken.seconds() +
-    timeTaken.milliseconds() / millisecondsInSecond} seconds`;
+  return `${timeTaken.minutes().toFixed(precision)} minutes, ${(
+    timeTaken.seconds() +
+    timeTaken.milliseconds() / millisecondsInSecond
+  ).toFixed(precision)} seconds`;
 };
 
 const _getSlackMessage = (success: boolean) => {

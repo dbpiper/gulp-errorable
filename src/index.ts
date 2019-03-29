@@ -1,11 +1,12 @@
 import { parallel, series } from 'gulp';
 import _ from 'lodash';
-import { Task } from 'undertaker';
+import { Task, TaskFunction } from 'undertaker';
 import DefaultRegistry from 'undertaker-registry';
 
 // This simply matches the type used in undertaker
 // tslint:disable-next-line: no-any
 type PromiseTaskFunction<T> = (done: (error?: any) => void) => Promise<T>;
+type PromiseComposeTaskFunction<T> = (...tasks: Task[]) => Promise<T>;
 // tslint:disable-next-line: no-any
 export type ErrorHandlingFunction = () => Promise<any>;
 
@@ -44,26 +45,48 @@ class ErrorableRegistry extends DefaultRegistry {
   }
 }
 
-const seriesPromise = (...tasks: Task[]): PromiseTaskFunction<any> => () =>
-  new Promise((resolve, reject) => {
-    series(...tasks)(error => {
-      if (error) {
-        reject(error);
-      } else {
-        resolve();
-      }
-    });
-  });
+const isString = (stringObject: string | undefined): stringObject is string =>
+  typeof stringObject === 'string';
 
-const parallelPromise = (...tasks: Task[]): PromiseTaskFunction<any> => () =>
-  new Promise((resolve, reject) => {
-    parallel(...tasks)(error => {
-      if (error) {
-        reject(error);
-      } else {
-        resolve();
-      }
+const _promisifyComposeTaskFunction = (
+  composeTaskFunction: (...tasks: Task[]) => TaskFunction,
+) => (options: {
+  name?: string;
+  tasks: Task[];
+  // tslint:disable-next-line: no-any
+}) => {
+  const composablePromiseFunction = () =>
+    new Promise((resolve, reject) => {
+      composeTaskFunction(...options.tasks)(error => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve();
+        }
+      });
     });
-  });
+
+  if (isString(options.name)) {
+    // console.log(options);
+    Object.defineProperty(composablePromiseFunction, 'name', {
+      value: options.name,
+    });
+  }
+  return composablePromiseFunction;
+};
+
+const seriesPromise = (options: {
+  name?: string;
+  tasks: Task[];
+  // tslint:disable-next-line: no-any
+}): PromiseComposeTaskFunction<any> =>
+  _promisifyComposeTaskFunction(series)(options);
+
+const parallelPromise = (options: {
+  name?: string;
+  tasks: Task[];
+  // tslint:disable-next-line: no-any
+}): PromiseComposeTaskFunction<any> =>
+  _promisifyComposeTaskFunction(parallel)(options);
 
 export { ErrorableRegistry, seriesPromise, parallelPromise };

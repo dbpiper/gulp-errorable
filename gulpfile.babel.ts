@@ -72,7 +72,10 @@ const _sleepForReview = () => {
   return _sleep(reviewTime);
 };
 
-const _gitStatusHumanReview = seriesPromise(_gitStatus, _sleepForReview);
+const _gitStatusHumanReview = seriesPromise({
+  name: '_gitStatusHumanReview',
+  tasks: [_gitStatus, _sleepForReview],
+});
 
 const _failMe = () => Promise.reject('failed!!');
 
@@ -80,18 +83,30 @@ const _failMe = () => Promise.reject('failed!!');
  * Public
  **************************************************************************** */
 
-const lint = seriesPromise(_lintTs, _checkTypes);
+const lint = seriesPromise({
+  name: 'lint',
+  tasks: [_lintTs, _checkTypes],
+});
 
-const build = seriesPromise(_buildJs, _buildTypes);
+const build = seriesPromise({
+  name: 'build',
+  tasks: [_buildJs, _buildTypes],
+});
 
-const test = seriesPromise(build, _runTest);
+const test = seriesPromise({
+  name: 'test',
+  tasks: [build, _runTest],
+});
 
-const verify = seriesPromise(
-  _registerSlackNotify,
-  _gitStatusHumanReview,
-  lint,
-  test,
-  _slackNotify,
-);
+const verify = seriesPromise({
+  name: 'verify',
+  tasks: [
+    _registerSlackNotify,
+    _gitStatusHumanReview,
+    lint,
+    test,
+    _slackNotify,
+  ],
+});
 
 export { lint, build, test, verify };
